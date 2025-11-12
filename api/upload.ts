@@ -1,117 +1,94 @@
-// api/upload.ts
-import { VercelRequest, VercelResponse } from "@vercel/node";
-import Busboy from "busboy";
-import { initializeApp, cert } from "firebase-admin/app";
-import { getStorage } from "firebase-admin/storage";
-import stream from "stream";
+// server/routes/upload.ts
+import multer from "multer";
+import express, { Request, Response, NextFunction } from "express";
+import path from "path";
+import fs from "fs";
 
-const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || "";
-const FIREBASE_CLIENT_EMAIL = process.env.FIREBASE_CLIENT_EMAIL || "";
-const FIREBASE_PRIVATE_KEY = (process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n");
-const FIREBASE_STORAGE_BUCKET = process.env.FIREBASE_STORAGE_BUCKET || ""; // e.g. "infinityx-edtech.appspot.com"
+const router = express.Router();
 
-if (!FIREBASE_PROJECT_ID || !FIREBASE_CLIENT_EMAIL || !FIREBASE_PRIVATE_KEY || !FIREBASE_STORAGE_BUCKET) {
-  console.warn("Missing Firebase env variables for upload API (upload.ts).");
+// ✅ Ensure uploads directory exists (synchronously before use)
+const uploadsDir = path.join(process.cwd(), "public", "uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Initialize firebase-admin once per lambda instance
-let firebaseInitialized = false;
-try {
-  if (!firebaseInitialized) {
-    initializeApp({
-      credential: cert({
-        projectId: FIREBASE_PROJECT_ID,
-        clientEmail: FIREBASE_CLIENT_EMAIL,
-        privateKey: FIREBASE_PRIVATE_KEY,
-      } as any),
-      storageBucket: FIREBASE_STORAGE_BUCKET,
-    });
-    firebaseInitialized = true;
-  }
-} catch (e) {
-  // ignore repeated initialization errors
-}
+// ✅ Configure multer storage
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadsDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+    cb(null, uniqueName);
+  },
+});
 
-/**
- * Helper: upload buffer to Firebase Storage and make it public.
- */
-async function uploadBufferToStorage(filename: string, buffer: Buffer, mimetype: string) {
-  const bucket = getStorage().bucket();
-  const file = bucket.file(`uploads/${filename}`);
-  const passthrough = new stream.PassThrough();
-  passthrough.end(buffer);
+// ✅ Configure multer with limits and image-only filter
+const upload = multer({
+  storage,
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
+  fileFilter: (req, file, cb) => {
+    const allowed = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+      "image/svg+xml",
+    ];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error("Invalid file type. Only image files are allowed."));
+  },
+});
 
-  await new Promise<void>((resolve, reject) => {
-    const writeStream = file.createWriteStream({
-      metadata: { contentType: mimetype },
-      resumable: false,
-    });
-    passthrough.pipe(writeStream)
-      .on("finish", () => resolve())
-      .on("error", (err) => reject(err));
-  });
-
-  // Make file public (so you can GET it without auth)
+// ✅ Upload route
+router.post("/", upload.single("file"), async (req: Request, res: Response) => {
   try {
-    await file.makePublic();
-  } catch (err) {
-    // makePublic may fail depending on IAM; still continue and return signedUrl fallback if needed
-    console.warn("makePublic failed:", err);
-  }
-
-  // Public URL pattern for Firebase Storage (when public):
-  const publicUrl = `https://storage.googleapis.com/${FIREBASE_STORAGE_BUCKET}/uploads/${filename}`;
-  return publicUrl;
-}
-
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== "POST") {
-    res.setHeader("Allow", "POST");
-    return res.status(405).json({ success: false, error: "Method Not Allowed" });
-  }
-
-  try {
-    const busboy = Busboy({ headers: req.headers });
-    const fileBuffers: Array<{ fieldname: string; filename: string; mime: string; buffer: Buffer }> = [];
-
-    await new Promise<void>((resolve, reject) => {
-      busboy.on("file", (fieldname, fileStream, filename, encoding, mimetype) => {
-        const chunks: Buffer[] = [];
-        fileStream.on("data", (d) => chunks.push(Buffer.from(d)));
-        fileStream.on("end", () => {
-          fileBuffers.push({
-            fieldname,
-            filename,
-            mime: mimetype,
-            buffer: Buffer.concat(chunks),
-          });
-        });
-      });
-
-      busboy.on("error", (err) => reject(err));
-      busboy.on("finish", () => resolve());
-      busboy.end(req.rawBody || req.body || Buffer.from([]));
-    });
-
-    if (!fileBuffers.length) {
+    if (!req.file) {
+      // Always respond with JSON even when file missing
       return res.status(400).json({ success: false, error: "No file uploaded" });
     }
 
-    // We'll upload the first file
-    const f = fileBuffers[0];
-    const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${f.filename ? ("-" + f.filename.replace(/\s+/g, "_")) : ""}`;
-
-    const publicUrl = await uploadBufferToStorage(uniqueName, f.buffer, f.mime);
-
+    const url = `/uploads/${req.file.filename}`;
     return res.status(200).json({
       success: true,
-      url: publicUrl,
-      filename: uniqueName,
-      size: f.buffer.length,
-      mimetype: f.mime,
+      url,
+      filename: req.file.filename,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
     });
   } catch (err: any) {
-    console.error("upload api error:", err);
-    return res.status(500).json({ success: false, error: err?.message || "Upload failed" });
+    console.error("❌ Upload error:", err);
+    // Always send valid JSON, never leave response empty
+    return res.status(500).json({
+      success: false,
+      error: err?.message || "Unexpected upload error",
+    });
   }
-}
+});
+
+// ✅ Error handler to catch Multer + other errors
+router.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  if (res.headersSent) return next(err);
+
+  if (err instanceof multer.MulterError) {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({
+        success: false,
+        error: "File too large. Maximum size is 20MB.",
+      });
+    }
+    return res.status(400).json({ success: false, error: err.message });
+  }
+
+  if (err) {
+    console.error("❌ General error:", err);
+    return res.status(400).json({
+      success: false,
+      error: err.message || "Unexpected server error",
+    });
+  }
+
+  next();
+});
+
+export default router;
