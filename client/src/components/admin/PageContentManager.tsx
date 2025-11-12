@@ -98,6 +98,7 @@ export default function PageContentManager() {
   }, [aboutData]);
 
   // 📤 Handle file uploads
+  // 📤 Handle file uploads (safe JSON parsing)
   const handleImageUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
     section: "home" | "about",
@@ -105,44 +106,57 @@ export default function PageContentManager() {
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
+  
     // Validate file type
     if (!file.type.startsWith("image/")) {
       toast.error("❌ Please upload an image file");
       return;
     }
-
+  
     // Validate file size (20MB max)
     if (file.size > 20 * 1024 * 1024) {
       toast.error("❌ File too large. Maximum size is 20MB");
       return;
     }
-
+  
     const formData = new FormData();
     formData.append("file", file);
-
+  
     const uploadToast = toast.loading("⏳ Uploading image...");
-
+  
     try {
       const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const data = await res.json();
-      
-      if (!res.ok) {
-        throw new Error(data.error || "Upload failed");
+  
+      // ✅ Safely parse JSON to avoid "Unexpected end of JSON input"
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error("Server returned an invalid or empty response");
       }
-
+  
+      if (!res.ok) {
+        throw new Error(data?.error || "Upload failed");
+      }
+  
+      if (!data?.url) {
+        throw new Error("Upload succeeded but no file URL was returned");
+      }
+  
       const imageUrl = data.url;
       toast.success("✅ Image uploaded successfully!", { id: uploadToast });
-
+  
       if (section === "home") {
         setHomeContent((prev) => ({ ...prev, [key]: imageUrl }));
       } else {
         setAboutContent((prev) => ({ ...prev, [key]: imageUrl }));
       }
     } catch (err: any) {
+      console.error("❌ Upload error:", err);
       toast.error(err.message || "❌ Failed to upload image", { id: uploadToast });
     }
   };
+
 
   // Save handlers
   const handleSaveHome = () => {
