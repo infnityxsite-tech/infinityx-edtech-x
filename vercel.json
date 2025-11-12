@@ -1,13 +1,19 @@
 {
   "version": 2,
   "buildCommand": "pnpm install && pnpm build",
-  "framework": "vite",
-  "outputDirectory": "dist/client",
   "installCommand": "pnpm install",
+  "framework": null,
+  "outputDirectory": "dist/client",
+  "builds": [
+    {
+      "src": "server/_core/index.ts",
+      "use": "@vercel/node"
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "/api"
+      "destination": "/server/_core/index.ts"
     },
     {
       "source": "/uploads/:match*",
@@ -15,7 +21,7 @@
     },
     {
       "source": "/(.*)",
-      "destination": "/index.html"
+      "destination": "/server/_core/index.ts"
     }
   ]
 }
