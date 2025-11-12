@@ -2,7 +2,7 @@
   "version": 2,
   "buildCommand": "pnpm install && pnpm build",
   "installCommand": "pnpm install",
-  "outputDirectory": "dist",
+  "outputDirectory": "dist/public",
   "framework": "vite",
   "rewrites": [
     {
