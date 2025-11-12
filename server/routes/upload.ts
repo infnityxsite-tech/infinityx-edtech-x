@@ -1,4 +1,3 @@
-// server/routes/upload.ts
 import multer from "multer";
 import express, { Request, Response, NextFunction } from "express";
 import path from "path";
@@ -6,15 +5,17 @@ import fs from "fs";
 
 const router = express.Router();
 
-// ✅ Ensure uploads directory exists (synchronously before use)
+// Ensure uploads directory exists
 const uploadsDir = path.join(process.cwd(), "public", "uploads");
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// ✅ Configure multer storage
+// Configure multer with disk storage
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadsDir),
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
     const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
@@ -22,73 +23,52 @@ const storage = multer.diskStorage({
   },
 });
 
-// ✅ Configure multer with limits and image-only filter
 const upload = multer({
   storage,
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
+  limits: {
+    fileSize: 20 * 1024 * 1024, // 20MB
+  },
   fileFilter: (req, file, cb) => {
-    const allowed = [
-      "image/jpeg",
-      "image/jpg",
-      "image/png",
-      "image/gif",
-      "image/webp",
-      "image/svg+xml",
-    ];
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"];
     if (allowed.includes(file.mimetype)) cb(null, true);
-    else cb(new Error("Invalid file type. Only image files are allowed."));
+    else cb(new Error("Invalid file type"));
   },
 });
 
-// ✅ Upload route
-router.post("/", upload.single("file"), async (req: Request, res: Response) => {
-  try {
-    if (!req.file) {
-      // Always respond with JSON even when file missing
-      return res.status(400).json({ success: false, error: "No file uploaded" });
+// ✅ Type-safe route
+router.post(
+  "/",
+  upload.single("file"),
+  (req: Request, res: Response, next: NextFunction): void => {
+    try {
+      if (!req.file) {
+        res.status(400).json({ error: "No file uploaded" });
+        return;
+      }
+
+      const fileUrl = `/uploads/${req.file.filename}`;
+      res.json({
+        url: fileUrl,
+        filename: req.file.filename,
+        size: req.file.size,
+        mimetype: req.file.mimetype,
+      });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Upload failed" });
     }
-
-    const url = `/uploads/${req.file.filename}`;
-    return res.status(200).json({
-      success: true,
-      url,
-      filename: req.file.filename,
-      size: req.file.size,
-      mimetype: req.file.mimetype,
-    });
-  } catch (err: any) {
-    console.error("❌ Upload error:", err);
-    // Always send valid JSON, never leave response empty
-    return res.status(500).json({
-      success: false,
-      error: err?.message || "Unexpected upload error",
-    });
   }
-});
+);
 
-// ✅ Error handler to catch Multer + other errors
+// Error handler for multer
 router.use((err: any, req: Request, res: Response, next: NextFunction) => {
-  if (res.headersSent) return next(err);
-
   if (err instanceof multer.MulterError) {
     if (err.code === "LIMIT_FILE_SIZE") {
-      return res.status(400).json({
-        success: false,
-        error: "File too large. Maximum size is 20MB.",
-      });
+      res.status(400).json({ error: "File too large (max 20MB)" });
+      return;
     }
-    return res.status(400).json({ success: false, error: err.message });
   }
-
-  if (err) {
-    console.error("❌ General error:", err);
-    return res.status(400).json({
-      success: false,
-      error: err.message || "Unexpected server error",
-    });
-  }
-
-  next();
+  res.status(400).json({ error: err.message || "Upload error" });
 });
 
 export default router;
