@@ -6,7 +6,7 @@
   "installCommand": "pnpm install",
   "functions": {
     "api/**/*.ts": {
-      "runtime": "nodejs20.x"
+      "runtime": "vercel-nodejs@20.0.0"
     }
   },
   "rewrites": [
