@@ -1,18 +1,10 @@
 {
   "version": 2,
+  "framework": null,
   "buildCommand": "pnpm install && pnpm build",
-  "outputDirectory": "dist/public",
-  "framework": "vite",
   "installCommand": "pnpm install",
-  "functions": {
-    "api/**/*.ts": {
-      "runtime": "nodejs20.x"
-    }
-  },
+  "outputDirectory": "dist/public",
   "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "/api"
-    }
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
