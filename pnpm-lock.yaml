@@ -115,6 +115,9 @@ importers:
       axios:
         specifier: ^1.12.0
         version: 1.13.2
+      busboy:
+        specifier: ^1.6.0
+        version: 1.6.0
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
