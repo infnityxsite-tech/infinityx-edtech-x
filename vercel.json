@@ -4,11 +4,6 @@
   "buildCommand": "pnpm install && pnpm build",
   "installCommand": "pnpm install",
   "outputDirectory": "dist/public",
-  "functions": {
-    "api/**/*.ts": {
-      "runtime": "nodejs20"
-    }
-  },
   "rewrites": [
     {
       "source": "/api/(.*)",
