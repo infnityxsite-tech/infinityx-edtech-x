@@ -1,6 +1,11 @@
 // server/routes/upload.ts
 import multer from "multer";
 import express, { Request, Response, NextFunction } from "express";
+
+// Define a custom interface for requests that have a file attached by multer
+interface MulterRequest extends Request {
+  file: Express.Multer.File;
+}
 import path from "path";
 import fs from "fs";
 
@@ -41,7 +46,7 @@ const upload = multer({
 });
 
 // ✅ Upload route
-router.post("/", upload.single("file"), async (req: Request, res: Response) => {
+router.post("/", upload.single("file"), async (req: MulterRequest, res: Response) => {
   try {
     if (!req.file) {
       // Always respond with JSON even when file missing

@@ -1,5 +1,10 @@
 import multer from "multer";
 import express, { Request, Response, NextFunction } from "express";
+
+// Define a custom interface for requests that have a file attached by multer
+interface MulterRequest extends Request {
+  file: Express.Multer.File;
+}
 import path from "path";
 import fs from "fs";
 
@@ -39,7 +44,7 @@ const upload = multer({
 router.post(
   "/",
   upload.single("file"),
-  (req: Request, res: Response, next: NextFunction): void => {
+  (req: MulterRequest, res: Response, next: NextFunction): void => {
     try {
       if (!req.file) {
         res.status(400).json({ error: "No file uploaded" });

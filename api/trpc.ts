@@ -3,8 +3,8 @@ import express from "express";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 
 // ضبط المسارات حسب مشروعك: هذا يفترض أن الـ router موجود في server/routers
-import { appRouter } from "./server/routers";
-import { createContext } from "./server/_core/context";
+import { appRouter } from "../server/routers";
+import { createContext } from "../server/_core/context";
 
 // تهيئة الــ Express app مرة واحدة (سيُعاد استعماله لكل طلب)
 const app = express();

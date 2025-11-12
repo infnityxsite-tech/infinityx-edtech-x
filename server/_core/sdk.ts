@@ -2,7 +2,7 @@ import { AXIOS_TIMEOUT_MS, COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { ForbiddenError } from "@shared/_core/errors";
 import axios, { type AxiosInstance } from "axios";
 import { parse as parseCookieHeader } from "cookie";
-import type { Request } from "express";
+import { Request } from "express";
 import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../db";
 import * as db from "../db";
