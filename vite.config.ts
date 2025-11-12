@@ -23,6 +23,14 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+
+    // ✅ Added performance + deployment improvements:
+    chunkSizeWarningLimit: 2000, // prevent large file warnings
+    rollupOptions: {
+      output: {
+        manualChunks: undefined, // lets Vite handle splitting efficiently
+      },
+    },
   },
   server: {
     host: true,

@@ -4,10 +4,19 @@
   "buildCommand": "pnpm install && pnpm build",
   "installCommand": "pnpm install",
   "outputDirectory": "dist/public",
+  "functions": {
+    "api/**/*.ts": {
+      "runtime": "nodejs20"
+    }
+  },
   "routes": [
     {
       "src": "^/api/.*$",
-      "dest": "/api/upload.ts"
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/(.*)\\.(js|css|png|jpg|jpeg|gif|svg|ico|txt|json)$",
+      "dest": "/dist/public/$1"
     },
     {
       "src": "/(.*)",
