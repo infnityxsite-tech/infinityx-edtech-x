@@ -1,24 +1,21 @@
-import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
+// server/_core/context.ts
+
 import type { User } from "../db";
 import { sdk } from "./sdk";
 
 export type TrpcContext = {
-  req: CreateExpressContextOptions["req"];
-  res: CreateExpressContextOptions["res"];
+  req: any;
+  res: any;
   user: User | null;
 };
 
-export async function createContext(
-  opts: CreateExpressContextOptions
-): Promise<TrpcContext> {
+export async function createContext(opts: { req: any; res: any }): Promise<TrpcContext> {
   let user: User | null = null;
 
   try {
     // Try normal Manus authentication
     user = await sdk.authenticateRequest(opts.req);
   } catch (error) {
-    // Authentication failed (normal in local dev)
-    // 👇 Fallback: create a dummy admin user for local access
     if (process.env.NODE_ENV === "development") {
       user = {
         id: "local-admin",
@@ -27,7 +24,6 @@ export async function createContext(
         role: "admin",
       } as unknown as User;
     } else {
-      // In production, keep user null if not authenticated
       user = null;
     }
   }
